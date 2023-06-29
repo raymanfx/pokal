@@ -18,11 +18,16 @@ if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
     add_compile_options(-Wno-maybe-uninitialized)
 endif()
 
+# 3rd party components
+add_subdirectory(3rdparty)
+
 add_executable(pokal
         main.c
         dhcpserver/dhcpserver.c
         dnsserver/dnsserver.c
         repl.c
+        repl_fs.c
+        fs.c
         )
 
 target_include_directories(pokal PRIVATE
@@ -35,6 +40,7 @@ target_include_directories(pokal PRIVATE
 target_link_libraries(pokal
         pico_cyw43_arch_lwip_threadsafe_background
         pico_stdlib
+        littlefs
         )
 
 # PICO_CMAKE_CONFIG: PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS, Maximum number of milliseconds to wait during initialization for a CDC connection from the host (negative means indefinite) during initialization, default=0, group=pico_stdio_usb

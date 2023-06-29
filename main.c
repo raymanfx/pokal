@@ -16,6 +16,8 @@
 #include "dnsserver.h"
 
 #include "repl.h"
+#include "repl_fs.h"
+#include "fs.h"
 
 #define TCP_PORT 80
 #define DEBUG_printf printf
@@ -284,6 +286,34 @@ int main() {
         return 1;
     }
 
+    // mount the filesystem
+    int err = lfs_mount(&lfs, &lfs_cfg);
+
+    // reformat if we can't mount the filesystem
+    // this should only happen on the first boot
+    if (err) {
+        lfs_format(&lfs, &lfs_cfg);
+        lfs_mount(&lfs, &lfs_cfg);
+        printf("failed to mount FS, formatting ..\n");
+    }
+
+    // read current count
+    lfs_file_t file;
+    uint32_t boot_count = 0;
+    lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
+    lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
+
+    // update boot count
+    boot_count += 1;
+    lfs_file_rewind(&lfs, &file);
+    lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
+
+    // remember the storage is not updated until the file is closed successfully
+    lfs_file_close(&lfs, &file);
+
+    // print the boot count
+    printf("boot_count: %d\n", boot_count);
+
     // TODO: read from SPI flash
     const char *ap_name = "picow_test";
     const char *password = "password";
@@ -307,6 +337,10 @@ int main() {
         return 1;
     }
 
+    // Register REPL commands
+    repl_cmds[0].cmd = "fs";
+    repl_cmds[0].handler = repl_fs;
+
     // Read Eval Print Loop (REPL)
     repl_enter();
 
@@ -314,5 +348,9 @@ int main() {
     dns_server_deinit(&dns_server);
     dhcp_server_deinit(&dhcp_server);
     cyw43_arch_deinit();
+
+    // release any resources we were using
+    lfs_unmount(&lfs);
+
     return 0;
 }
