@@ -36,6 +36,10 @@ target_link_libraries(pokal
         pico_stdlib
         )
 
+# PICO_CMAKE_CONFIG: PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS, Maximum number of milliseconds to wait during initialization for a CDC connection from the host (negative means indefinite) during initialization, default=0, group=pico_stdio_usb
+target_compile_definitions(pokal PRIVATE
+        PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=1000)
+
 # enable usb output, disable uart output
 pico_enable_stdio_usb(pokal 1)
 pico_enable_stdio_uart(pokal 0)
