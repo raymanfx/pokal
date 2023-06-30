@@ -15,6 +15,8 @@
 #include "dhcpserver.h"
 #include "dnsserver.h"
 
+#include "repl.h"
+
 #define TCP_PORT 80
 #define DEBUG_printf printf
 #define POLL_TIME_S 5
@@ -28,7 +30,6 @@
 
 typedef struct TCP_SERVER_T_ {
     struct tcp_pcb *server_pcb;
-    bool complete;
     ip_addr_t gw;
     async_context_t *context;
 } TCP_SERVER_T;
@@ -269,27 +270,6 @@ static bool tcp_server_open(void *arg, const char *ap_name) {
     return true;
 }
 
-// This "worker" function is called to safely perform work when instructed by key_pressed_func
-void key_pressed_worker_func(async_context_t *context, async_when_pending_worker_t *worker) {
-    assert(worker->user_data);
-    printf("Disabling wifi\n");
-    cyw43_arch_disable_ap_mode();
-    ((TCP_SERVER_T*)(worker->user_data))->complete = true;
-}
-
-static async_when_pending_worker_t key_pressed_worker = {
-        .do_work = key_pressed_worker_func
-};
-
-void key_pressed_func(void *param) {
-    assert(param);
-    int key = getchar_timeout_us(0); // get any pending key press but don't wait
-    if (key == 'd' || key == 'D') {
-        // We are probably in irq context so call wifi in a "worker"
-        async_context_set_work_pending(((TCP_SERVER_T*)param)->context, &key_pressed_worker);
-    }
-}
-
 int main() {
     stdio_init_all();
 
@@ -303,12 +283,6 @@ int main() {
         DEBUG_printf("failed to initialise\n");
         return 1;
     }
-
-    // Get notified if the user presses a key
-    state->context = cyw43_arch_async_context();
-    key_pressed_worker.user_data = state;
-    async_context_add_when_pending_worker(cyw43_arch_async_context(), &key_pressed_worker);
-    stdio_set_chars_available_callback(key_pressed_func, state);
 
     // TODO: read from SPI flash
     const char *ap_name = "picow_test";
@@ -333,13 +307,9 @@ int main() {
         return 1;
     }
 
-    state->complete = false;
-    while(!state->complete) {
-        // if you are not using pico_cyw43_arch_poll, then Wi-FI driver and lwIP work
-        // is done via interrupt in the background. This sleep is just an example of some (blocking)
-        // work you might be doing.
-        sleep_ms(1000);
-    }
+    // Read Eval Print Loop (REPL)
+    repl_enter();
+
     tcp_server_close(state);
     dns_server_deinit(&dns_server);
     dhcp_server_deinit(&dhcp_server);

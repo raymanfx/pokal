@@ -22,6 +22,7 @@ add_executable(pokal
         main.c
         dhcpserver/dhcpserver.c
         dnsserver/dnsserver.c
+        repl.c
         )
 
 target_include_directories(pokal PRIVATE
