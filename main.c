@@ -8,6 +8,7 @@
 
 #include "pico/cyw43_arch.h"
 #include "pico/stdlib.h"
+#include "hardware/watchdog.h"
 
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
@@ -351,6 +352,9 @@ int main() {
 
     // release any resources we were using
     lfs_unmount(&lfs);
+
+    // reboot by using the watchdog to reset to flash
+    watchdog_reboot(0, 0, PICO_STDIO_USB_RESET_RESET_TO_FLASH_DELAY_MS);
 
     return 0;
 }

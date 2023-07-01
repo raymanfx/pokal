@@ -40,6 +40,7 @@ target_include_directories(pokal PRIVATE
 target_link_libraries(pokal
         pico_cyw43_arch_lwip_threadsafe_background
         pico_stdlib
+        pico_usb_reset_interface
         littlefs
         )
 
