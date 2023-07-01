@@ -23,14 +23,9 @@ static struct repl_cmd LUT[] = {
 };
 
 void repl_reset(const char *line) {
-    for (int i = 0; i < sizeof(LUT) / sizeof(LUT[0]); i++) {
-        if (strncmp(line, LUT[i].cmd, strlen(LUT[i].cmd)) == 0) {
-            LUT[i].handler(line + strlen(LUT[i].cmd) + 1);
-            return;
-        }
+    if (repl_dispatch(line, LUT, sizeof(LUT) / sizeof(LUT[0])) == 0) {
+        printf("< reset: unknown cmd: %s\n", line);
     }
-
-    printf("< reset: unknown cmd: %s\n", line);
 }
 
 static void repl_reset_flash(const char *path) {

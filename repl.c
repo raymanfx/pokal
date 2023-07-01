@@ -4,12 +4,9 @@
 
 #include "repl.h"
 
-struct repl_cmd repl_cmds[REPL_CMD_MAX] = {0};
-
 static int repl_getline(char *line, size_t maxlen);
-static int repl_dispatch(const char *line);
 
-void repl_enter() {
+void repl_enter(const struct repl_cmd cmds[], size_t len) {
     char line[REPL_LINE_MAXLEN];
 
     printf("--- REPL ---\n");
@@ -19,14 +16,30 @@ void repl_enter() {
             break;
         }
 
-        //printf("< %s\n", line);
-        switch (repl_dispatch(line)) {
-        case 0:
+        // special-case this command so we can bail out of the REPL
+        if (strncmp(line, "quit", strlen("quit")) == 0 || strncmp(line, "q", strlen("q")) == 0) {
+            printf("< quit\n");
             return;
-        default:
-            break;
+        }
+
+        // dispatch other commands to their respective handlers
+        if (repl_dispatch(line, cmds, len) == 0) {
+            printf("< repl: unknown cmd: %s\n", line);
         }
     }
+}
+
+int repl_dispatch(const char *line, const struct repl_cmd cmds[], size_t len) {
+    int count = 0;
+
+    for (int i = 0; i < len; i++) {
+        if (strncmp(line, cmds[i].cmd, strlen(cmds[i].cmd)) == 0) {
+            cmds[i].handler(line + strlen(cmds[i].cmd) + 1);
+            count++;
+        }
+    }
+
+    return count;
 }
 
 static int repl_getline(char *line, size_t maxlen) {
@@ -71,19 +84,4 @@ static int repl_getline(char *line, size_t maxlen) {
     }
 
     return 0;
-}
-
-static int repl_dispatch(const char *line) {
-    if (strncmp(line, "quit", strlen("quit")) == 0 || strncmp(line, "q", strlen("q")) == 0) {
-        printf("< quit\n");
-        return 0;
-    }
-
-    for (int i = 0; i < REPL_CMD_MAX; i++) {
-        if (repl_cmds[i].cmd && strncmp(line, repl_cmds[i].cmd, strlen(repl_cmds[i].cmd)) == 0) {
-            repl_cmds[i].handler(line + strlen(repl_cmds[i].cmd) + 1);
-        }
-    }
-
-    return 1;
 }

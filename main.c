@@ -32,6 +32,18 @@
 #define LED_GPIO 0
 #define HTTP_RESPONSE_REDIRECT "HTTP/1.1 302 Redirect\nLocation: http://%s" LED_TEST "\n\n"
 
+// Read Eval Print Loop (REPL) command look-up table
+static struct repl_cmd REPL_CMDS[] = {
+    {
+        .cmd = "fs",
+        .handler = repl_fs,
+    },
+    {
+        .cmd = "reset",
+        .handler = repl_reset,
+    },
+};
+
 typedef struct TCP_SERVER_T_ {
     struct tcp_pcb *server_pcb;
     ip_addr_t gw;
@@ -339,14 +351,8 @@ int main() {
         return 1;
     }
 
-    // Register REPL commands
-    repl_cmds[0].cmd = "fs";
-    repl_cmds[0].handler = repl_fs;
-    repl_cmds[1].cmd = "reset";
-    repl_cmds[1].handler = repl_reset;
-
     // Read Eval Print Loop (REPL)
-    repl_enter();
+    repl_enter(REPL_CMDS, sizeof(REPL_CMDS) / sizeof(REPL_CMDS[0]));
 
     tcp_server_close(state);
     dns_server_deinit(&dns_server);
