@@ -27,6 +27,7 @@ add_executable(pokal
         dnsserver/dnsserver.c
         repl.c
         repl_fs.c
+        repl_reset.c
         fs.c
         )
 

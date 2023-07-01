@@ -18,6 +18,7 @@
 
 #include "repl.h"
 #include "repl_fs.h"
+#include "repl_reset.h"
 #include "fs.h"
 
 #define TCP_PORT 80
@@ -341,6 +342,8 @@ int main() {
     // Register REPL commands
     repl_cmds[0].cmd = "fs";
     repl_cmds[0].handler = repl_fs;
+    repl_cmds[1].cmd = "reset";
+    repl_cmds[1].handler = repl_reset;
 
     // Read Eval Print Loop (REPL)
     repl_enter();
