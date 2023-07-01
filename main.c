@@ -19,6 +19,7 @@
 #include "repl.h"
 #include "repl_fs.h"
 #include "repl_reset.h"
+#include "repl_ups.h"
 #include "fs.h"
 
 #define TCP_PORT 80
@@ -41,6 +42,10 @@ static struct repl_cmd REPL_CMDS[] = {
     {
         .cmd = "reset",
         .handler = repl_reset,
+    },
+    {
+        .cmd = "ups",
+        .handler = repl_ups,
     },
 };
 
