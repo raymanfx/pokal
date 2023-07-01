@@ -1,18 +1,31 @@
 #include "fs.h"
+#include "repl.h"
 
 #include "repl_fs.h"
 
 static void repl_fs_ls(const char *path);
 static void repl_fs_cat(const char *path);
 
+static struct repl_cmd LUT[] = {
+    {
+        .cmd = "ls",
+        .handler = repl_fs_ls,
+    },
+    {
+        .cmd = "cat",
+        .handler = repl_fs_cat,
+    },
+};
+
 void repl_fs(const char *line) {
-    if (strncmp(line, "ls", strlen("ls")) == 0) {
-        repl_fs_ls(line + strlen("ls") + 1);
-    } else if (strncmp(line, "cat", strlen("cat")) == 0) {
-        repl_fs_cat(line + strlen("cat") + 1);
-    } else {
-        printf("< fs: unknown cmd: %s\n", line);
+    for (int i = 0; i < sizeof(LUT) / sizeof(LUT[0]); i++) {
+        if (strncmp(line, LUT[i].cmd, strlen(LUT[i].cmd)) == 0) {
+            LUT[i].handler(line + strlen(LUT[i].cmd) + 1);
+            return;
+        }
     }
+
+    printf("< fs: unknown cmd: %s\n", line);
 }
 
 static void repl_fs_ls(const char *path) {
