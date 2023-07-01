@@ -4,12 +4,14 @@
 #include "GUI_Paint.h"
 
 #include "epaper.h"
+#include "epaper_gui.h"
 #include "repl.h"
 #include "repl_epaper.h"
 
 static void repl_epaper_clear(const char *line);
 static void repl_epaper_sleep(const char *line);
 static void repl_epaper_test(const char *line);
+static void repl_epaper_gui(const char *line);
 
 static struct repl_cmd LUT[] = {
     {
@@ -23,6 +25,10 @@ static struct repl_cmd LUT[] = {
     {
         .cmd = "test",
         .handler = repl_epaper_test,
+    },
+    {
+        .cmd = "gui",
+        .handler = repl_epaper_gui,
     },
 };
 
@@ -112,4 +118,9 @@ static void repl_epaper_test(const char *line) {
 
     free(img_red);
     free(img_black);
+}
+
+static void repl_epaper_gui(const char *line) {
+    printf("< epaper: drawing GUI\n");
+    epaper_gui_draw();
 }
