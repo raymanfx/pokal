@@ -29,8 +29,10 @@ add_executable(pokal
         repl_fs.c
         repl_reset.c
         repl_ups.c
+        repl_epaper.c
         fs.c
         ina219.c
+        epaper.c
         )
 
 target_include_directories(pokal PRIVATE
@@ -46,6 +48,8 @@ target_link_libraries(pokal
         pico_usb_reset_interface
         littlefs
         hardware_i2c
+        epaper583b
+        epd_gui
         )
 
 # PICO_CMAKE_CONFIG: PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS, Maximum number of milliseconds to wait during initialization for a CDC connection from the host (negative means indefinite) during initialization, default=0, group=pico_stdio_usb

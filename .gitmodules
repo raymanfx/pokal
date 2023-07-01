@@ -1,3 +1,6 @@
 [submodule "3rdparty/littlefs"]
 	path = 3rdparty/littlefs
 	url = https://github.com/littlefs-project/littlefs.git
+[submodule "3rdparty/Pico_ePaper_Code"]
+	path = 3rdparty/Pico_ePaper_Code
+	url = https://github.com/waveshareteam/Pico_ePaper_Code.git
