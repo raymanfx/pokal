@@ -10,13 +10,8 @@
 #define TCP_PORT 80
 #define DEBUG_printf printf
 #define POLL_TIME_S 5
-#define HTTP_GET "GET"
 #define HTTP_RESPONSE_HEADERS "HTTP/1.1 %d OK\nContent-Length: %d\nContent-Type: text/html; charset=utf-8\nConnection: close\n\n"
-#define LED_TEST_BODY "<html><body><h1>Hello from Pico W.</h1><p>Led is %s</p><p><a href=\"?led=%d\">Turn led %s</a></body></html>"
-#define LED_PARAM "led=%d"
-#define LED_TEST "/ledtest"
-#define LED_GPIO 0
-#define HTTP_RESPONSE_REDIRECT "HTTP/1.1 302 Redirect\nLocation: http://%s" LED_TEST "\n\n"
+#define HTTP_RESPONSE_REDIRECT "HTTP/1.1 302 Redirect\nLocation: http://%s/\n\n"
 
 static err_t tcp_close_client_connection(http_connection_t *con, struct tcp_pcb *client_pcb, err_t close_err) {
     if (client_pcb) {
@@ -50,115 +45,92 @@ static err_t tcp_server_sent(void *arg, struct tcp_pcb *pcb, u16_t len) {
     return ERR_OK;
 }
 
-static int test_server_content(const char *request, const char *params, char *result, size_t max_result_len) {
-    int len = 0;
-    if (strncmp(request, LED_TEST, sizeof(LED_TEST) - 1) == 0) {
-        // Get the state of the led
-        bool value;
-        cyw43_gpio_get(&cyw43_state, LED_GPIO, &value);
-        int led_state = value;
-
-        // See if the user changed it
-        if (params) {
-            int led_param = sscanf(params, LED_PARAM, &led_state);
-            if (led_param == 1) {
-                if (led_state) {
-                    // Turn led on
-                    cyw43_gpio_set(&cyw43_state, 0, true);
-                } else {
-                    // Turn led off
-                    cyw43_gpio_set(&cyw43_state, 0, false);
-                }
-            }
-        }
-        // Generate result
-        if (led_state) {
-            len = snprintf(result, max_result_len, LED_TEST_BODY, "ON", 0, "OFF");
-        } else {
-            len = snprintf(result, max_result_len, LED_TEST_BODY, "OFF", 1, "ON");
-        }
-    }
-    return len;
-}
-
 err_t tcp_server_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err) {
     http_connection_t *con = (http_connection_t*)arg;
+    http_server_t *server = con->server;
+    http_route_fn handler = NULL;
+    char header[1024];
+
     if (!p) {
         DEBUG_printf("connection closed\n");
         return tcp_close_client_connection(con, pcb, ERR_OK);
     }
     assert(con && con->pcb == pcb);
-    if (p->tot_len > 0) {
-        DEBUG_printf("tcp_server_recv %d err %d\n", p->tot_len, err);
-#if 0
-        for (struct pbuf *q = p; q != NULL; q = q->next) {
-            DEBUG_printf("in: %.*s\n", q->len, q->payload);
-        }
-#endif
-        // Copy the request into the buffer
-        pbuf_copy_partial(p, con->headers, p->tot_len > sizeof(con->headers) - 1 ? sizeof(con->headers) - 1 : p->tot_len, 0);
 
-        // Handle GET request
-        if (strncmp(HTTP_GET, con->headers, sizeof(HTTP_GET) - 1) == 0) {
-            char *request = con->headers + sizeof(HTTP_GET); // + space
-            char *params = strchr(request, '?');
-            if (params) {
-                if (*params) {
-                    char *space = strchr(request, ' ');
-                    *params++ = 0;
-                    if (space) {
-                        *space = 0;
-                    }
-                } else {
-                    params = NULL;
-                }
-            }
-
-            // Generate content
-            con->result_len = test_server_content(request, params, con->result, sizeof(con->result));
-            DEBUG_printf("Request: %s?%s\n", request, params);
-            DEBUG_printf("Result: %d\n", con->result_len);
-
-            // Check we had enough buffer space
-            if (con->result_len > sizeof(con->result) - 1) {
-                DEBUG_printf("Too much result data %d\n", con->result_len);
-                return tcp_close_client_connection(con, pcb, ERR_CLSD);
-            }
-
-            // Generate web page
-            if (con->result_len > 0) {
-                con->header_len = snprintf(con->headers, sizeof(con->headers), HTTP_RESPONSE_HEADERS,
-                    200, con->result_len);
-                if (con->header_len > sizeof(con->headers) - 1) {
-                    DEBUG_printf("Too much header data %d\n", con->header_len);
-                    return tcp_close_client_connection(con, pcb, ERR_CLSD);
-                }
-            } else {
-                // Send redirect
-                con->header_len = snprintf(con->headers, sizeof(con->headers), HTTP_RESPONSE_REDIRECT,
-                    ipaddr_ntoa(con->gw));
-                DEBUG_printf("Sending redirect %s", con->headers);
-            }
-
-            // Send the headers to the client
-            con->sent_len = 0;
-            err_t err = tcp_write(pcb, con->headers, con->header_len, 0);
-            if (err != ERR_OK) {
-                DEBUG_printf("failed to write header data %d\n", err);
-                return tcp_close_client_connection(con, pcb, err);
-            }
-
-            // Send the body to the client
-            if (con->result_len) {
-                err = tcp_write(pcb, con->result, con->result_len, 0);
-                if (err != ERR_OK) {
-                    DEBUG_printf("failed to write result data %d\n", err);
-                    return tcp_close_client_connection(con, pcb, err);
-                }
-            }
-        }
-        tcp_recved(pcb, p->tot_len);
+    if (p->tot_len <= 0) {
+        pbuf_free(p);
+        return ERR_OK;
     }
+
+    DEBUG_printf("tcp_server_recv %d err %d\n", p->tot_len, err);
+#if 0
+    for (struct pbuf *q = p; q != NULL; q = q->next) {
+        DEBUG_printf("in: %.*s\n", q->len, q->payload);
+    }
+#endif
+    // Copy the request into the buffer
+    pbuf_copy_partial(p, header, p->tot_len > sizeof(header) - 1 ? sizeof(header) - 1 : p->tot_len, 0);
+
+    // Invoke the appropriate route handler
+    con->result_len = 0;
+    for (int i = 0; i < server->routes_len; i++) {
+        if (strncmp(server->routes[i].method_and_path, header,
+                    strlen(server->routes[i].method_and_path)) == 0) {
+            handler = server->routes[i].handler;
+            break;
+        }
+    }
+
+    if (handler) {
+        // Copy the full request and pass it to the handler
+        pbuf_copy_partial(p, con->request,
+                          p->tot_len > sizeof(con->request) - 1 ? sizeof(con->request) - 1 : p->tot_len, 0);
+        con->result_len = handler(con->request, p->tot_len, con->result, sizeof(con->result));
+    }
+
+    // Generate content
+    DEBUG_printf("Request: %s\n", con->request);
+    DEBUG_printf("Result: %s\n", con->result);
+
+    // Check we had enough buffer space
+    if (con->result_len > sizeof(con->result) - 1) {
+        DEBUG_printf("Too much result data %d\n", con->result_len);
+        return tcp_close_client_connection(con, pcb, ERR_CLSD);
+    }
+
+    // Generate web page
+    if (con->result_len > 0) {
+        con->header_len = snprintf(header, sizeof(header), HTTP_RESPONSE_HEADERS,
+            200, con->result_len);
+        if (con->header_len > sizeof(header) - 1) {
+            DEBUG_printf("Too much header data %d\n", con->header_len);
+            return tcp_close_client_connection(con, pcb, ERR_CLSD);
+        }
+    } else {
+        // Send redirect
+        con->header_len = snprintf(header, sizeof(header), HTTP_RESPONSE_REDIRECT,
+            ipaddr_ntoa(con->gw));
+        DEBUG_printf("Sending redirect %s", header);
+    }
+
+    // Send the headers to the client
+    con->sent_len = 0;
+    err = tcp_write(pcb, header, con->header_len, 0);
+    if (err != ERR_OK) {
+        DEBUG_printf("failed to write header data %d\n", err);
+        return tcp_close_client_connection(con, pcb, err);
+    }
+
+    // Send the body to the client
+    if (con->result_len) {
+        err = tcp_write(pcb, con->result, con->result_len, 0);
+        if (err != ERR_OK) {
+            DEBUG_printf("failed to write result data %d\n", err);
+            return tcp_close_client_connection(con, pcb, err);
+        }
+    }
+    tcp_recved(pcb, p->tot_len);
+
     pbuf_free(p);
     return ERR_OK;
 }
@@ -191,6 +163,7 @@ static err_t http_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err
         DEBUG_printf("failed to allocate connection\n");
         return ERR_MEM;
     }
+    con->server = server;
     con->pcb = client_pcb; // for checking
     con->gw = &server->gw;
 

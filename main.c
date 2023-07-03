@@ -20,6 +20,8 @@
 #include "repl_ups.h"
 #include "repl_epaper.h"
 #include "fs.h"
+#include "route_root.h"
+#include "route_led.h"
 
 // Read Eval Print Loop (REPL) command look-up table
 static struct repl_cmd REPL_CMDS[] = {
@@ -39,6 +41,13 @@ static struct repl_cmd REPL_CMDS[] = {
         .cmd = "epaper",
         .handler = repl_epaper,
     },
+};
+
+// HTTP routes consisting of a method (e.g. "GET") and a path (e.g. "/")
+// NOTE: most specific *must* come first!
+static http_route_t HTTP_ROUTES[] = {
+    http_route_get_led,
+    http_route_get_root,
 };
 
 int main() {
@@ -95,6 +104,10 @@ int main() {
     // Start the dns server
     dns_server_t dns_server;
     dns_server_init(&dns_server, &http_server.gw);
+
+    // Mount HTTP routes
+    http_server.routes = HTTP_ROUTES;
+    http_server.routes_len = sizeof(HTTP_ROUTES) / sizeof(http_route_t);
 
     // Start the http server
     if (!http_server_open(&http_server)) {

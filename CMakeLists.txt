@@ -35,6 +35,8 @@ add_executable(pokal
         ina219.c
         epaper.c
         epaper_gui.c
+        route_root.c
+        route_led.c
         )
 
 target_include_directories(pokal PRIVATE
