@@ -25,6 +25,7 @@ add_executable(pokal
         main.c
         dhcpserver/dhcpserver.c
         dnsserver/dnsserver.c
+        httpserver/httpserver.c
         repl.c
         repl_fs.c
         repl_reset.c
@@ -41,6 +42,7 @@ target_include_directories(pokal PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/.. # for our common lwipopts
         ${CMAKE_CURRENT_LIST_DIR}/dhcpserver
         ${CMAKE_CURRENT_LIST_DIR}/dnsserver
+        ${CMAKE_CURRENT_LIST_DIR}/httpserver
         )
 
 target_link_libraries(pokal
