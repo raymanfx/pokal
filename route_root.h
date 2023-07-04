@@ -3,7 +3,7 @@
 
 #include "httpserver.h"
 
-int http_get_root(const char *request, int request_len, char *result, size_t max_result_len);
+void http_get_root(const http_request_t *req, http_response_t *res);
 
 static const http_route_t http_route_get_root = {
     .method_and_path = "GET /",

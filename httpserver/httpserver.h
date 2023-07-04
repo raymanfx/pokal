@@ -4,7 +4,21 @@
 #include "pico/async_context.h"
 #include "lwip/ip_addr.h"
 
-typedef int (*http_route_fn)(const char*, int, char*, size_t);
+typedef struct http_request_t_ {
+    const char *header;
+    const char *body;
+} http_request_t;
+
+typedef struct http_response_t_ {
+    char *header;
+    size_t header_len;
+    size_t header_maxlen;
+    char *body;
+    size_t body_len;
+    size_t body_maxlen;
+} http_response_t;
+
+typedef void (*http_route_fn)(const http_request_t*, http_response_t*);
 
 typedef struct http_route_t_ {
     const char *method_and_path;
@@ -36,5 +50,8 @@ typedef enum http_method_t_ {
 
 bool http_server_open(http_server_t *server);
 void http_server_close(http_server_t *server);
+
+#define HTTP_RESPONSE_OK "HTTP/1.1 %d OK\nContent-Length: %d\nContent-Type: text/html; charset=utf-8\nConnection: close\n\n"
+#define HTTP_RESPONSE_REDIRECT "HTTP/1.1 %d Redirect\nLocation: %s\n\n"
 
 #endif // _HTTPSERVER_H_

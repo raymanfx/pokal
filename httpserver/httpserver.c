@@ -10,8 +10,6 @@
 #define TCP_PORT 80
 #define DEBUG_printf printf
 #define POLL_TIME_S 5
-#define HTTP_RESPONSE_HEADERS "HTTP/1.1 %d OK\nContent-Length: %d\nContent-Type: text/html; charset=utf-8\nConnection: close\n\n"
-#define HTTP_RESPONSE_REDIRECT "HTTP/1.1 302 Redirect\nLocation: http://%s/\n\n"
 
 static err_t tcp_close_client_connection(http_connection_t *con, struct tcp_pcb *client_pcb, err_t close_err) {
     if (client_pcb) {
@@ -48,7 +46,7 @@ static err_t tcp_server_sent(void *arg, struct tcp_pcb *pcb, u16_t len) {
 err_t tcp_server_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err) {
     http_connection_t *con = (http_connection_t*)arg;
     http_server_t *server = con->server;
-    http_route_fn handler = NULL;
+    http_route_t *route = NULL;
     char header[1024];
 
     if (!p) {
@@ -72,50 +70,53 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
     pbuf_copy_partial(p, header, p->tot_len > sizeof(header) - 1 ? sizeof(header) - 1 : p->tot_len, 0);
 
     // Invoke the appropriate route handler
-    con->result_len = 0;
     for (int i = 0; i < server->routes_len; i++) {
         if (strncmp(server->routes[i].method_and_path, header,
                     strlen(server->routes[i].method_and_path)) == 0) {
-            handler = server->routes[i].handler;
+            route = &server->routes[i];
             break;
         }
     }
 
-    if (handler) {
-        // Copy the full request and pass it to the handler
-        pbuf_copy_partial(p, con->request,
-                          p->tot_len > sizeof(con->request) - 1 ? sizeof(con->request) - 1 : p->tot_len, 0);
-        con->result_len = handler(con->request, p->tot_len, con->result, sizeof(con->result));
+    if (!route) {
+        DEBUG_printf("No handler found for request: %s\n", header);
+        return tcp_close_client_connection(con, pcb, ERR_CLSD);
     }
+
+    // Copy the full request and pass it to the handler
+    pbuf_copy_partial(p, con->request, p->tot_len > sizeof(con->request) - 1 ? sizeof(con->request) - 1 : p->tot_len, 0);
+
+    // Create intermediate helper structs
+    const http_request_t req = {
+        .header = header,
+        .body = strstr(con->request, "\r\n\r\n"),
+    };
+    http_response_t res = {
+        .header = header,
+        .header_len = 0,
+        .header_maxlen = sizeof(header) - 1,
+        .body = con->result,
+        .body_len = 0,
+        .body_maxlen = sizeof(con->result) - 1,
+    };
+
+    // Invoke the handler which will populate the result struct
+    route->handler(&req, &res);
+    con->result_len = res.body_len;
+    con->header_len = res.header_len;
 
     // Generate content
     DEBUG_printf("Request: %s\n", con->request);
     DEBUG_printf("Result: %s\n", con->result);
 
-    // Check we had enough buffer space
-    if (con->result_len > sizeof(con->result) - 1) {
-        DEBUG_printf("Too much result data %d\n", con->result_len);
+    if (con->header_len == 0) {
+        DEBUG_printf("No response header generated for route: %s\n", route->method_and_path);
         return tcp_close_client_connection(con, pcb, ERR_CLSD);
-    }
-
-    // Generate web page
-    if (con->result_len > 0) {
-        con->header_len = snprintf(header, sizeof(header), HTTP_RESPONSE_HEADERS,
-            200, con->result_len);
-        if (con->header_len > sizeof(header) - 1) {
-            DEBUG_printf("Too much header data %d\n", con->header_len);
-            return tcp_close_client_connection(con, pcb, ERR_CLSD);
-        }
-    } else {
-        // Send redirect
-        con->header_len = snprintf(header, sizeof(header), HTTP_RESPONSE_REDIRECT,
-            ipaddr_ntoa(con->gw));
-        DEBUG_printf("Sending redirect %s", header);
     }
 
     // Send the headers to the client
     con->sent_len = 0;
-    err = tcp_write(pcb, header, con->header_len, 0);
+    err = tcp_write(pcb, res.header, con->header_len, 0);
     if (err != ERR_OK) {
         DEBUG_printf("failed to write header data %d\n", err);
         return tcp_close_client_connection(con, pcb, err);

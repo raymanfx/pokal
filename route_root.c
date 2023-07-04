@@ -1,6 +1,8 @@
 #include "route_root.h"
 
-int http_get_root(const char *request, int request_len, char *result, size_t max_result_len) {
+void http_get_root(const http_request_t *req, http_response_t *res) {
+    int rc;
+
     // Generate result
     const char *body = ""
         "<html>"
@@ -9,5 +11,14 @@ int http_get_root(const char *request, int request_len, char *result, size_t max
             "</body>"
         "</html>";
 
-    return snprintf(result, max_result_len, body);
+    rc = snprintf(res->body, res->body_maxlen, body);
+    if (rc < res->body_maxlen) {
+        res->body_len = rc;
+    }
+
+    // Generate header
+    rc = snprintf(res->header, res->header_maxlen, HTTP_RESPONSE_OK, 200, res->body_len);
+    if (rc < res->header_maxlen) {
+        res->header_len = rc;
+    }
 }

@@ -2,13 +2,13 @@
 
 #include "route_led.h"
 
-int http_get_led(const char *request, int request_len, char *result, size_t max_result_len) {
-    int len = 0;
-    char *params = strchr(request, '?');
+void http_get_led(const http_request_t *req, http_response_t *res) {
+    char *params = strchr(req->header, '?');
+    int rc;
 
     if (params) {
         if (*params) {
-            char *space = strchr(request, ' ');
+            char *space = strchr(req->header, ' ');
             *params++ = 0;
             if (space) {
                 *space = 0;
@@ -48,10 +48,20 @@ int http_get_led(const char *request, int request_len, char *result, size_t max_
             "</body>"
         "</html>";
     if (led_state) {
-        len = snprintf(result, max_result_len, body, "ON", 0, "OFF");
+        rc = snprintf(res->body, res->body_maxlen, body, "ON", 0, "OFF");
+        if (rc < res->body_maxlen) {
+            res->body_len = rc;
+        }
     } else {
-        len = snprintf(result, max_result_len, body, "OFF", 1, "ON");
+        rc = snprintf(res->body, res->body_maxlen, body, "OFF", 1, "ON");
+        if (rc < res->body_maxlen) {
+            res->body_len = rc;
+        }
     }
 
-    return len;
+    // Generate header
+    rc = snprintf(res->header, res->header_maxlen, HTTP_RESPONSE_OK, 200, res->body_len);
+    if (rc < res->header_maxlen) {
+        res->header_len = rc;
+    }
 }
