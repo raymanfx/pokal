@@ -8,6 +8,7 @@ void http_get_root(const http_request_t *req, http_response_t *res) {
         "<html>"
             "<body>"
                 "<p><a href=/led>LED</a>"
+                "<p><a href=/fs>FS</a>"
             "</body>"
         "</html>";
 

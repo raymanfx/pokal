@@ -47,7 +47,8 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
     http_connection_t *con = (http_connection_t*)arg;
     http_server_t *server = con->server;
     http_route_t *route = NULL;
-    char header[1024];
+    char response_header[1024];
+    int rx_len, rx_maxlen;
 
     if (!p) {
         DEBUG_printf("connection closed\n");
@@ -66,12 +67,65 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
         DEBUG_printf("in: %.*s\n", q->len, q->payload);
     }
 #endif
+
+    // Warn if we do not have enough space to store the payload
+    rx_maxlen = sizeof(con->request) - con->request_len - 1;
+    rx_len = p->tot_len > rx_maxlen ? rx_maxlen : p->tot_len;
+    if (p->tot_len > rx_len) {
+        DEBUG_printf("warning: not enough space for payload (%d vs %d)\n", p->tot_len, rx_len);
+    }
+
     // Copy the request into the buffer
-    pbuf_copy_partial(p, header, p->tot_len > sizeof(header) - 1 ? sizeof(header) - 1 : p->tot_len, 0);
+    pbuf_copy_partial(p, con->request + con->request_len, rx_len, 0);
+    con->request_len += rx_len;
+
+    // Detect request body (if any)
+    const char *request_body_marker = "\r\n\r\n";
+    char *request_body = strstr(con->request, request_body_marker);
+    while (request_body && strncmp(request_body, request_body_marker, strlen(request_body_marker)) == 0) {
+        request_body += strlen(request_body_marker);
+    }
+
+    if (request_body >= con->request + con->request_len) {
+        request_body = NULL;
+    } else {
+        // Sanitize request header and body
+        char *cursor;
+        while ((cursor = strstr(con->request, request_body_marker)) != NULL) {
+            for (size_t i = 0; i < strlen(request_body_marker); i++) {
+                // Sanitize request header
+                cursor[i] = '\0';
+            }
+        }
+    }
+
+    if ((strstr(con->request, "Content-Length:") != NULL) && (request_body == NULL)) {
+        // We expect the request body next, so start another tcp RX
+        tcp_recved(pcb, p->tot_len);
+        pbuf_free(p);
+        return ERR_OK;
+    } else {
+        // Indicate that we are ready to receive another request
+        con->request_len = 0;
+    }
+
+    // Create intermediate helper structs
+    const http_request_t req = {
+        .header = con->request,
+        .body = request_body,
+    };
+    http_response_t res = {
+        .header = response_header,
+        .header_len = 0,
+        .header_maxlen = sizeof(response_header) - 1,
+        .body = con->result,
+        .body_len = 0,
+        .body_maxlen = sizeof(con->result) - 1,
+    };
 
     // Invoke the appropriate route handler
     for (int i = 0; i < server->routes_len; i++) {
-        if (strncmp(server->routes[i].method_and_path, header,
+        if (strncmp(server->routes[i].method_and_path, req.header,
                     strlen(server->routes[i].method_and_path)) == 0) {
             route = &server->routes[i];
             break;
@@ -79,35 +133,28 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
     }
 
     if (!route) {
-        DEBUG_printf("No handler found for request: %s\n", header);
+        DEBUG_printf("No handler found for request: %s\n", req.header);
         return tcp_close_client_connection(con, pcb, ERR_CLSD);
     }
 
-    // Copy the full request and pass it to the handler
-    pbuf_copy_partial(p, con->request, p->tot_len > sizeof(con->request) - 1 ? sizeof(con->request) - 1 : p->tot_len, 0);
-
-    // Create intermediate helper structs
-    const http_request_t req = {
-        .header = header,
-        .body = strstr(con->request, "\r\n\r\n"),
-    };
-    http_response_t res = {
-        .header = header,
-        .header_len = 0,
-        .header_maxlen = sizeof(header) - 1,
-        .body = con->result,
-        .body_len = 0,
-        .body_maxlen = sizeof(con->result) - 1,
-    };
+    // Debug
+    DEBUG_printf("---\n");
+    DEBUG_printf("Request Header: \n%s\n", req.header);
+    DEBUG_printf("---\n");
+    DEBUG_printf("Request Body: \n%s\n", req.body);
+    DEBUG_printf("---\n");
 
     // Invoke the handler which will populate the result struct
     route->handler(&req, &res);
     con->result_len = res.body_len;
     con->header_len = res.header_len;
 
-    // Generate content
-    DEBUG_printf("Request: %s\n", con->request);
-    DEBUG_printf("Result: %s\n", con->result);
+    // Debug
+    DEBUG_printf("---\n");
+    DEBUG_printf("Response Header: \n%s\n", res.header);
+    DEBUG_printf("---\n");
+    DEBUG_printf("Response Body: \n%s\n", res.body);
+    DEBUG_printf("---\n");
 
     if (con->header_len == 0) {
         DEBUG_printf("No response header generated for route: %s\n", route->method_and_path);

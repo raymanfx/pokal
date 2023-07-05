@@ -22,6 +22,7 @@
 #include "fs.h"
 #include "route_root.h"
 #include "route_led.h"
+#include "route_fs.h"
 
 // Read Eval Print Loop (REPL) command look-up table
 static struct repl_cmd REPL_CMDS[] = {
@@ -46,6 +47,8 @@ static struct repl_cmd REPL_CMDS[] = {
 // HTTP routes consisting of a method (e.g. "GET") and a path (e.g. "/")
 // NOTE: most specific *must* come first!
 static http_route_t HTTP_ROUTES[] = {
+    http_route_get_fs,
+    http_route_post_fs,
     http_route_get_led,
     http_route_get_root,
 };

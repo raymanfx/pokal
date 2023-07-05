@@ -37,6 +37,7 @@ add_executable(pokal
         epaper_gui.c
         route_root.c
         route_led.c
+        route_fs.c
         )
 
 target_include_directories(pokal PRIVATE

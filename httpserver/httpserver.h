@@ -39,6 +39,7 @@ typedef struct http_connection_t_ {
     int sent_len;
     char request[10240];
     char result[10240];
+    int request_len;
     int header_len;
     int result_len;
     ip_addr_t *gw;
