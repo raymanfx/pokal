@@ -89,6 +89,10 @@ int main() {
     // print the boot count
     printf("boot_count: %d\n", boot_count);
 
+    // ensure the database is present
+    lfs_file_open(&lfs, &file, "db.txt", LFS_O_RDWR | LFS_O_CREAT);
+    lfs_file_close(&lfs, &file);
+
     // TODO: read from SPI flash
     const char *ap_name = "picow_test";
     const char *password = "password";
