@@ -23,6 +23,7 @@
 #include "route_root.h"
 #include "route_led.h"
 #include "route_fs.h"
+#include "epaper_gui.h"
 
 // Read Eval Print Loop (REPL) command look-up table
 static struct repl_cmd REPL_CMDS[] = {
@@ -60,6 +61,28 @@ int main() {
         printf("failed to initialise\n");
         return 1;
     }
+
+    sleep_ms(1000);
+
+    const uint LED_PIN = 16;
+    const uint SWITCH_PIN = 17;
+
+    //set Wifi LED
+    gpio_init(LED_PIN);     
+    gpio_set_dir(LED_PIN, GPIO_OUT);
+
+    //read external switch
+    gpio_init(SWITCH_PIN);
+    gpio_set_dir(SWITCH_PIN, GPIO_IN);
+
+    if(gpio_get(SWITCH_PIN)==1){
+        gpio_put(LED_PIN, 1);
+    }else{
+        gpio_put(LED_PIN, 0);
+    }
+
+    //first draw after bottup
+    epaper_gui_draw();
 
     // mount the filesystem
     int err = lfs_mount(&lfs, &lfs_cfg);

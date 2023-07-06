@@ -5,6 +5,7 @@
 
 static void repl_fs_ls(const char *path);
 static void repl_fs_cat(const char *path);
+static void repl_fs_xcat(const char *path);
 
 static struct repl_cmd LUT[] = {
     {
@@ -14,6 +15,10 @@ static struct repl_cmd LUT[] = {
     {
         .cmd = "cat",
         .handler = repl_fs_cat,
+    },
+    {
+        .cmd = "xcat",
+        .handler = repl_fs_xcat,
     },
 };
 
@@ -62,7 +67,7 @@ static void repl_fs_ls(const char *path) {
     lfs_dir_close(&lfs, &dir);
 }
 
-static void repl_fs_cat(const char *path) {
+static void repl_fs_xcat(const char *path) {
     lfs_file_t file;
     char buf[10];
     int rc;
@@ -86,6 +91,37 @@ static void repl_fs_cat(const char *path) {
 
         for (int i = 0; i < read; i++) {
             printf("%2x ", buf[i]);
+        }
+    }
+    printf("\n");
+
+    lfs_file_close(&lfs, &file);
+}
+
+static void repl_fs_cat(const char *path) {
+    lfs_file_t file;
+    char buf[10];
+    int rc;
+    lfs_ssize_t read;
+
+    rc = lfs_file_open(&lfs, &file, path, LFS_O_RDONLY);
+    if (rc < 0) {
+        printf("< fs: cat: failed to open file: %s\n", path);
+        return;
+    }
+
+    while (1) {
+        read = lfs_file_read(&lfs, &file, &buf, sizeof(buf));
+        if (read < 0) {
+            printf("< fs: cat: failed to read file: %s\n", path);
+            lfs_file_close(&lfs, &file);
+            return;
+        } else if (read == 0) {
+            break;
+        }
+
+        for (int i = 0; i < read; i++) {
+            printf("%c", buf[i]);
         }
     }
     printf("\n");

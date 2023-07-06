@@ -38,6 +38,7 @@ add_executable(pokal
         route_root.c
         route_led.c
         route_fs.c
+        tableread.c
         )
 
 target_include_directories(pokal PRIVATE
